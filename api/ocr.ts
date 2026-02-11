@@ -6,13 +6,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { image } = req.body;
+  const { image, vertical } = req.body;
   if (!image || typeof image !== 'string') {
     return res.status(400).json({ error: 'Missing image field' });
   }
 
   try {
-    const worker = await Tesseract.createWorker('jpn');
+    // Use jpn_vert for vertical Japanese text, jpn for horizontal
+    const lang = vertical ? 'jpn_vert' : 'jpn';
+    const worker = await Tesseract.createWorker(lang);
+
+    // PSM 5 = vertical text block, PSM 6 = uniform horizontal block
+    await worker.setParameters({
+      tessedit_pageseg_mode: vertical
+        ? Tesseract.PSM.SINGLE_BLOCK_VERT_TEXT
+        : Tesseract.PSM.SINGLE_BLOCK,
+    });
+
     const { data: { text } } = await worker.recognize(image);
     await worker.terminate();
 

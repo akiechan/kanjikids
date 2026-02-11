@@ -584,6 +584,11 @@ body {
   height: 80%;
 }
 
+.scan-box.wide {
+  width: 80%;
+  height: 30%;
+}
+
 @keyframes scan-pulse {
   0%, 100% { border-color: var(--camera); }
   50% { border-color: #69F0AE; }
@@ -670,6 +675,33 @@ body {
   font-size: 15px;
   color: var(--text-light);
   font-weight: 700;
+}
+
+.box-toggle {
+  display: flex;
+  gap: 8px;
+  background: #E8E8E8;
+  border-radius: 30px;
+  padding: 4px;
+}
+
+.toggle-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 26px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  background: transparent;
+  color: var(--text-light);
+  transition: all 0.2s;
+}
+
+.toggle-btn.active {
+  background: var(--camera);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 191, 165, 0.3);
 }
 
 .captured-crop {

@@ -6,6 +6,7 @@ export default function CameraMode({ deeplKey, onBack }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [capturedImage, setCapturedImage] = useState(null);
   const [results, setResults] = useState([]);
+  const [boxMode, setBoxMode] = useState('tall'); // 'tall' or 'wide'
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -48,9 +49,13 @@ export default function CameraMode({ deeplKey, onBack }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    // Crop to the tall rectangle scan box (30% width, 80% height, centered)
-    const cropW = video.videoWidth * 0.3;
-    const cropH = video.videoHeight * 0.8;
+    // Crop dimensions based on box mode
+    const cropW = boxMode === 'tall'
+      ? video.videoWidth * 0.3
+      : video.videoWidth * 0.8;
+    const cropH = boxMode === 'tall'
+      ? video.videoHeight * 0.8
+      : video.videoHeight * 0.3;
     const cropX = (video.videoWidth - cropW) / 2;
     const cropY = (video.videoHeight - cropH) / 2;
 
@@ -79,7 +84,10 @@ export default function CameraMode({ deeplKey, onBack }) {
       const ocrRes = await fetch('/api/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageData }),
+        body: JSON.stringify({
+          image: imageData,
+          vertical: boxMode === 'tall',
+        }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -103,7 +111,7 @@ export default function CameraMode({ deeplKey, onBack }) {
     }
 
     setIsAnalyzing(false);
-  }, [stopCamera]);
+  }, [stopCamera, boxMode]);
 
   const handleBack = () => {
     stopCamera();
@@ -136,7 +144,7 @@ export default function CameraMode({ deeplKey, onBack }) {
             className="visible zoomed"
           />
           <div className="scan-overlay">
-            <div className="scan-box tall" />
+            <div className={`scan-box ${boxMode}`} />
           </div>
           <canvas ref={canvasRef} style={{ display: 'none' }} />
         </div>
@@ -157,6 +165,20 @@ export default function CameraMode({ deeplKey, onBack }) {
         )}
         {isStreaming && (
           <>
+            <div className="box-toggle">
+              <button
+                className={`toggle-btn ${boxMode === 'tall' ? 'active' : ''}`}
+                onClick={() => setBoxMode('tall')}
+              >
+                たて
+              </button>
+              <button
+                className={`toggle-btn ${boxMode === 'wide' ? 'active' : ''}`}
+                onClick={() => setBoxMode('wide')}
+              >
+                よこ
+              </button>
+            </div>
             <button className="camera-shutter-btn" onClick={takePicture}>
               📸
             </button>
@@ -177,7 +199,7 @@ export default function CameraMode({ deeplKey, onBack }) {
         </div>
       )}
 
-      {!isAnalyzing && results.length > 0 && (
+      {!isAnalyzing && results.length > 0 && !results[0].timeout && (
         <div className="live-results">
           {results.map((result) => (
             <div key={result.id} className="live-result-item">

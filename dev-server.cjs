@@ -62,13 +62,21 @@ app.post('/api/tokenize', (req, res) => {
 });
 
 app.post('/api/ocr', async (req, res) => {
-  const { image } = req.body;
+  const { image, vertical } = req.body;
   if (!image) {
     return res.status(400).json({ error: 'Missing image' });
   }
 
   try {
-    const worker = await Tesseract.createWorker('jpn');
+    // Use jpn_vert for vertical Japanese text, jpn for horizontal
+    const lang = vertical ? 'jpn_vert' : 'jpn';
+    const worker = await Tesseract.createWorker(lang);
+
+    // PSM 5 = vertical text block, PSM 6 = uniform horizontal block
+    await worker.setParameters({
+      tessedit_pageseg_mode: vertical ? '5' : '6',
+    });
+
     const { data: { text } } = await worker.recognize(image);
     await worker.terminate();
 
