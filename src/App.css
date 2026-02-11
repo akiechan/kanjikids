@@ -82,6 +82,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   padding: 40px 20px;
   min-height: 100vh;
 }
@@ -322,8 +323,10 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   padding: 30px 20px;
+  flex: 1;
 }
 
 .mic-btn,
@@ -531,6 +534,14 @@ body {
   line-height: 1.6;
 }
 
+/* ===== Mode Containers ===== */
+.speech-mode,
+.camera-mode {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
 /* ===== Camera Mode ===== */
 .camera-area {
   position: relative;
@@ -615,8 +626,10 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   padding: 24px;
   gap: 16px;
+  flex: 1;
 }
 
 .camera-start-btn {

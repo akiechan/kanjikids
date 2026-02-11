@@ -1,11 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getFurigana, speak } from '../utils/japanese'
+import { batchTranslate, translateWithDeepL } from '../utils/api'
 
 export default function CameraMode({ deeplKey, onBack }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [capturedImage, setCapturedImage] = useState(null);
   const [results, setResults] = useState([]);
+  const [error, setError] = useState(null);
+  const [wordTranslations, setWordTranslations] = useState({});
+  const [englishTranslation, setEnglishTranslation] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
   const [boxMode, setBoxMode] = useState('tall'); // 'tall' or 'wide'
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -27,6 +32,9 @@ export default function CameraMode({ deeplKey, onBack }) {
       setIsStreaming(true);
       setCapturedImage(null);
       setResults([]);
+      setError(null);
+      setWordTranslations({});
+      setEnglishTranslation('');
     } catch (err) {
       console.error('Camera error:', err);
       alert('カメラを　ひらけませんでした');
@@ -73,9 +81,7 @@ export default function CameraMode({ deeplKey, onBack }) {
     const ocrH = Math.round(cropH * scale);
     canvas.width = ocrW;
     canvas.height = ocrH;
-    ctx.filter = 'contrast(1.5) grayscale(1)';
     ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, ocrW, ocrH);
-    ctx.filter = 'none';
 
     stopCamera();
     setIsAnalyzing(true);
@@ -93,12 +99,24 @@ export default function CameraMode({ deeplKey, onBack }) {
       });
       clearTimeout(timeout);
 
-      if (!ocrRes.ok) throw new Error(`OCR error: ${ocrRes.status}`);
-      const { text: cleanText } = await ocrRes.json();
+      const ocrData = await ocrRes.json();
+      if (!ocrRes.ok) throw new Error(ocrData.error || `OCR error: ${ocrRes.status}`);
 
+      const cleanText = ocrData.text;
       if (cleanText && cleanText.length > 0) {
+        setError(null);
         const furigana = await getFurigana(cleanText);
         setResults([{ id: 1, text: cleanText, furigana }]);
+
+        const uniqueWords = [...new Set(
+          furigana
+            .filter((item) => item.text.trim().length > 0 && item.hasKanji)
+            .map((item) => item.text)
+        )];
+        if (uniqueWords.length > 0) {
+          const translations = await batchTranslate(uniqueWords, deeplKey);
+          setWordTranslations(translations);
+        }
       } else {
         setResults([]);
       }
@@ -107,12 +125,25 @@ export default function CameraMode({ deeplKey, onBack }) {
       if (err.name === 'AbortError') {
         setResults([{ id: 1, text: '', furigana: [], timeout: true }]);
       } else {
+        setError(err.message);
         setResults([]);
       }
     }
 
     setIsAnalyzing(false);
   }, [stopCamera, boxMode]);
+
+  const translateToEnglish = async () => {
+    if (!allText || isTranslating) return;
+    setIsTranslating(true);
+    try {
+      const translation = await translateWithDeepL(allText, deeplKey);
+      setEnglishTranslation(translation);
+    } catch (err) {
+      console.error('Translation error:', err);
+    }
+    setIsTranslating(false);
+  };
 
   const handleBack = () => {
     stopCamera();
@@ -198,16 +229,19 @@ export default function CameraMode({ deeplKey, onBack }) {
           {results.map((result) => (
             <div key={result.id} className="live-result-item">
               <div className="live-result-content">
-                <div className="furigana-text large">
+                <div className="furigana-text with-english" style={{ fontSize: 32 }}>
                   {result.furigana.map((item, i) => (
-                    <span key={i} className="word">
+                    <span key={i} className={`word-block ${item.hasKanji ? 'has-kanji' : ''}`}>
                       {item.hasKanji ? (
                         <ruby>
                           {item.text}
                           <rt>{item.reading}</rt>
                         </ruby>
                       ) : (
-                        item.text
+                        <span>{item.text}</span>
+                      )}
+                      {item.hasKanji && wordTranslations[item.text] && (
+                        <span className="word-english">{wordTranslations[item.text]}</span>
                       )}
                     </span>
                   ))}
@@ -229,15 +263,33 @@ export default function CameraMode({ deeplKey, onBack }) {
 
       {!isAnalyzing && capturedImage && results.length === 0 && (
         <div className="results-area">
-          <p className="no-results">かんじが　みつかりませんでした</p>
+          <p className="no-results">
+            {error ? `エラー: ${error}` : 'もじが　みつかりませんでした'}
+          </p>
         </div>
       )}
 
       {!isAnalyzing && allText && (
-        <div className="camera-controls">
+        <div className="translation-area">
           <button className="speak-btn-large" onClick={() => speak(allText)}>
             🔊 よむ
           </button>
+          <button
+            className="translate-btn"
+            onClick={translateToEnglish}
+            disabled={isTranslating}
+          >
+            🌐 えいごに　ほんやく
+          </button>
+
+          {englishTranslation && (
+            <div className="english-result">
+              <p>{englishTranslation}</p>
+              <button className="speak-btn" onClick={() => speak(englishTranslation, 'en-US')}>
+                🔊
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
