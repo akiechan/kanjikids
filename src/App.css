@@ -546,9 +546,17 @@ body {
   object-fit: cover;
 }
 
-.camera-area video.zoomed {
-  transform: scale(1.5);
-  transform-origin: center center;
+.camera-bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 16px;
+  z-index: 10;
 }
 
 .camera-area video.hidden {

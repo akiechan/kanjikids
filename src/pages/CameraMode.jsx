@@ -16,9 +16,8 @@ export default function CameraMode({ deeplKey, onBack }) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          zoom: { ideal: 2 },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         },
       });
       if (videoRef.current) {
@@ -64,20 +63,25 @@ export default function CameraMode({ deeplKey, onBack }) {
 
     // Save a color version for display
     ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-    const imageUrl = canvas.toDataURL('image/png');
+    const imageUrl = canvas.toDataURL('image/jpeg', 0.8);
     setCapturedImage(imageUrl);
 
-    // Apply filters for OCR
+    // Downscale for OCR (max 800px on longest side)
+    const maxOcr = 800;
+    const scale = Math.min(maxOcr / cropW, maxOcr / cropH, 1);
+    const ocrW = Math.round(cropW * scale);
+    const ocrH = Math.round(cropH * scale);
+    canvas.width = ocrW;
+    canvas.height = ocrH;
     ctx.filter = 'contrast(1.5) grayscale(1)';
-    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, ocrW, ocrH);
     ctx.filter = 'none';
 
     stopCamera();
     setIsAnalyzing(true);
 
     try {
-      // Send image to server-side OCR with 30s timeout
-      const imageData = canvas.toDataURL('image/png');
+      const imageData = canvas.toDataURL('image/jpeg', 0.9);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
 
@@ -140,10 +144,28 @@ export default function CameraMode({ deeplKey, onBack }) {
           ref={videoRef}
           autoPlay
           playsInline
-          className="zoomed"
         />
         <div className="scan-overlay">
           <div className={`scan-box ${boxMode}`} />
+        </div>
+        <div className="camera-bottom-bar">
+          <div className="box-toggle">
+            <button
+              className={`toggle-btn ${boxMode === 'tall' ? 'active' : ''}`}
+              onClick={() => setBoxMode('tall')}
+            >
+              たて
+            </button>
+            <button
+              className={`toggle-btn ${boxMode === 'wide' ? 'active' : ''}`}
+              onClick={() => setBoxMode('wide')}
+            >
+              よこ
+            </button>
+          </div>
+          <button className="camera-shutter-btn" onClick={takePicture}>
+            📸
+          </button>
         </div>
       </div>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
@@ -159,28 +181,6 @@ export default function CameraMode({ deeplKey, onBack }) {
           <button className="camera-start-btn" onClick={startCamera}>
             📷 カメラを　ひらく
           </button>
-        )}
-        {isStreaming && (
-          <>
-            <div className="box-toggle">
-              <button
-                className={`toggle-btn ${boxMode === 'tall' ? 'active' : ''}`}
-                onClick={() => setBoxMode('tall')}
-              >
-                たて
-              </button>
-              <button
-                className={`toggle-btn ${boxMode === 'wide' ? 'active' : ''}`}
-                onClick={() => setBoxMode('wide')}
-              >
-                よこ
-              </button>
-            </div>
-            <button className="camera-shutter-btn" onClick={takePicture}>
-              📸
-            </button>
-            <span className="shutter-hint">ボタンを　おして　しゃしんを　とってね</span>
-          </>
         )}
         {capturedImage && !isAnalyzing && (
           <button className="camera-start-btn" onClick={startCamera}>
