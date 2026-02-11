@@ -88,10 +88,7 @@ export default function CameraMode({ deeplKey, onBack }) {
       const ocrRes = await fetch('/api/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image: imageData,
-          vertical: boxMode === 'tall',
-        }),
+        body: JSON.stringify({ image: imageData }),
         signal: controller.signal,
       });
       clearTimeout(timeout);

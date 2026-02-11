@@ -1,7 +1,16 @@
+const fs = require('fs');
 const express = require('express');
 const kuromoji = require('kuromoji');
-const Tesseract = require('tesseract.js');
 const path = require('path');
+
+// Load .env
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  fs.readFileSync(envPath, 'utf8').split('\n').forEach((line) => {
+    const [key, ...val] = line.split('=');
+    if (key && val.length) process.env[key.trim()] = val.join('=').trim();
+  });
+}
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -61,40 +70,45 @@ app.post('/api/tokenize', (req, res) => {
   res.json({ furigana });
 });
 
-// Pre-initialize OCR workers for fast responses
-let ocrWorkerJpn = null;
-let ocrWorkerVert = null;
-
-async function initOcrWorkers() {
-  try {
-    const T = require('tesseract.js');
-    ocrWorkerJpn = await T.createWorker('jpn');
-    await ocrWorkerJpn.setParameters({ tessedit_pageseg_mode: '6' });
-    console.log('OCR worker (jpn) ready');
-
-    ocrWorkerVert = await T.createWorker('jpn_vert');
-    await ocrWorkerVert.setParameters({ tessedit_pageseg_mode: '5' });
-    console.log('OCR worker (jpn_vert) ready');
-  } catch (err) {
-    console.error('Failed to init OCR workers:', err);
-  }
-}
-initOcrWorkers();
-
 app.post('/api/ocr', async (req, res) => {
-  const { image, vertical } = req.body;
+  const { image } = req.body;
   if (!image) {
     return res.status(400).json({ error: 'Missing image' });
   }
 
-  const worker = vertical ? ocrWorkerVert : ocrWorkerJpn;
-  if (!worker) {
-    return res.status(503).json({ error: 'OCR worker loading...' });
+  const apiKey = process.env.GOOGLE_VISION_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'GOOGLE_VISION_KEY not set in .env' });
   }
 
   try {
-    const { data: { text } } = await worker.recognize(image);
-    const cleanText = text.replace(/[\s\n\r]+/g, '').trim();
+    const base64 = image.replace(/^data:image\/\w+;base64,/, '');
+
+    const visionRes = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image: { content: base64 },
+            features: [{ type: 'TEXT_DETECTION' }],
+            imageContext: { languageHints: ['ja'] },
+          }],
+        }),
+      }
+    );
+
+    if (!visionRes.ok) {
+      const err = await visionRes.text();
+      console.error('Vision API error:', err);
+      return res.status(500).json({ error: 'Vision API failed' });
+    }
+
+    const data = await visionRes.json();
+    const annotations = data.responses?.[0]?.textAnnotations;
+    const fullText = annotations?.[0]?.description || '';
+    const cleanText = fullText.replace(/[\s\n\r]+/g, '').trim();
     res.json({ text: cleanText });
   } catch (err) {
     console.error('OCR error:', err);
