@@ -575,8 +575,9 @@ body {
 }
 
 .scan-box.wide {
-  width: 70%;
-  height: 30%;
+  width: 60%;
+  aspect-ratio: 1 / 1;
+  height: auto;
 }
 
 @keyframes scan-pulse {
@@ -635,6 +636,45 @@ body {
 
 .camera-stop-btn:hover {
   transform: scale(1.05);
+}
+
+.camera-shutter-btn {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: white;
+  border: 5px solid var(--camera);
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 191, 165, 0.3);
+  transition: transform 0.2s;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-shutter-btn:hover {
+  transform: scale(1.1);
+}
+
+.camera-shutter-btn:active {
+  transform: scale(0.95);
+  background: var(--camera-light);
+}
+
+.captured-preview {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+.captured-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .processing {

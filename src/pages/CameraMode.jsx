@@ -3,17 +3,13 @@ import { getFurigana, speak } from '../utils/japanese'
 
 export default function CameraMode({ deeplKey, onBack }) {
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [capturedImage, setCapturedImage] = useState(null);
   const [results, setResults] = useState([]);
-  const [stopped, setStopped] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const workerRef = useRef(null);
-  const scanningRef = useRef(false);
-  const busyRef = useRef(false);
-  const intervalRef = useRef(null);
-  const resultIdRef = useRef(0);
 
   const startCamera = async () => {
     try {
@@ -25,7 +21,7 @@ export default function CameraMode({ deeplKey, onBack }) {
       }
       streamRef.current = stream;
       setIsStreaming(true);
-      setStopped(false);
+      setCapturedImage(null);
       setResults([]);
     } catch (err) {
       console.error('Camera error:', err);
@@ -41,85 +37,53 @@ export default function CameraMode({ deeplKey, onBack }) {
     setIsStreaming(false);
   }, []);
 
-  const captureFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return null;
+  const takePicture = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    const boxWidth = video.videoWidth * 0.7;
-    const boxHeight = video.videoHeight * 0.3;
-    const boxX = (video.videoWidth - boxWidth) / 2;
-    const boxY = (video.videoHeight - boxHeight) / 2;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-    canvas.width = boxWidth;
-    canvas.height = boxHeight;
+    // Save a color version for display
+    ctx.drawImage(video, 0, 0);
+    const imageUrl = canvas.toDataURL('image/png');
+    setCapturedImage(imageUrl);
 
+    // Apply filters for OCR
     ctx.filter = 'contrast(1.5) grayscale(1)';
-    ctx.drawImage(video, boxX, boxY, boxWidth, boxHeight, 0, 0, boxWidth, boxHeight);
+    ctx.drawImage(video, 0, 0);
     ctx.filter = 'none';
 
-    return canvas;
-  }, []);
+    stopCamera();
+    setIsAnalyzing(true);
 
-  const startScanning = async () => {
-    setIsScanning(true);
-    scanningRef.current = true;
-
-    const Tesseract = await import('tesseract.js');
-    workerRef.current = await Tesseract.createWorker('jpn');
-
-    const seenTexts = new Set();
-
-    intervalRef.current = setInterval(async () => {
-      if (busyRef.current || !scanningRef.current) return;
-      busyRef.current = true;
-
-      try {
-        const canvas = captureFrame();
-        if (!canvas) { busyRef.current = false; return; }
-
-        const { data: { text } } = await workerRef.current.recognize(canvas);
-        const cleanText = text.replace(/[\s\n\r]+/g, '').trim();
-
-        if (cleanText && cleanText.length > 1 && !seenTexts.has(cleanText)) {
-          seenTexts.add(cleanText);
-
-          try {
-            const furigana = await getFurigana(cleanText);
-            const id = ++resultIdRef.current;
-            setResults((prev) => [{ id, text: cleanText, furigana }, ...prev]);
-          } catch (e) {
-            console.error('Furigana error:', e);
-          }
-        }
-      } catch (err) {
-        console.error('OCR scan error:', err);
-      }
-
-      busyRef.current = false;
-    }, 2000);
-  };
-
-  const stopScanning = async () => {
-    scanningRef.current = false;
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (workerRef.current) {
+    try {
+      const Tesseract = await import('tesseract.js');
+      workerRef.current = await Tesseract.createWorker('jpn');
+      const { data: { text } } = await workerRef.current.recognize(canvas);
       await workerRef.current.terminate();
       workerRef.current = null;
+
+      const cleanText = text.replace(/[\s\n\r]+/g, '').trim();
+
+      if (cleanText && cleanText.length > 0) {
+        const furigana = await getFurigana(cleanText);
+        setResults([{ id: 1, text: cleanText, furigana }]);
+      } else {
+        setResults([]);
+      }
+    } catch (err) {
+      console.error('OCR error:', err);
+      setResults([]);
     }
-    setIsScanning(false);
-    stopCamera();
-    setStopped(true);
-  };
+
+    setIsAnalyzing(false);
+  }, [stopCamera]);
 
   const handleBack = async () => {
-    scanningRef.current = false;
-    if (intervalRef.current) clearInterval(intervalRef.current);
     if (workerRef.current) await workerRef.current.terminate().catch(() => {});
     stopCamera();
     onBack();
@@ -127,8 +91,6 @@ export default function CameraMode({ deeplKey, onBack }) {
 
   useEffect(() => {
     return () => {
-      scanningRef.current = false;
-      if (intervalRef.current) clearInterval(intervalRef.current);
       if (workerRef.current) workerRef.current.terminate().catch(() => {});
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -152,84 +114,77 @@ export default function CameraMode({ deeplKey, onBack }) {
           playsInline
           className={isStreaming ? 'visible' : 'hidden'}
         />
-        {isStreaming && (
-          <div className="scan-overlay">
-            <div className="scan-box wide">
-              <span className="scan-label">
-                {isScanning ? 'よみとりちゅう...' : 'ここに　かんじを　うつしてね'}
-              </span>
-            </div>
+        {capturedImage && !isStreaming && (
+          <div className="captured-preview">
+            <img src={capturedImage} alt="とった　しゃしん" />
           </div>
         )}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
       </div>
 
       <div className="camera-controls">
-        {!isStreaming && !stopped && (
+        {!isStreaming && !capturedImage && !isAnalyzing && (
           <button className="camera-start-btn" onClick={startCamera}>
             📷 カメラを　ひらく
           </button>
         )}
-        {isStreaming && !isScanning && (
-          <button className="camera-start-btn" onClick={startScanning}>
-            ▶️ よみとり　スタート
+        {isStreaming && (
+          <button className="camera-shutter-btn" onClick={takePicture}>
+            📸 しゃしんを　とる
           </button>
         )}
-        {isScanning && (
-          <button className="camera-stop-btn" onClick={stopScanning}>
-            ⏹️ とめる
-          </button>
-        )}
-        {stopped && results.length > 0 && (
+        {capturedImage && !isAnalyzing && (
           <button className="camera-start-btn" onClick={startCamera}>
-            📷 もういちど
+            📷 もういちど　とる
           </button>
         )}
       </div>
 
-      {isScanning && (
+      {isAnalyzing && (
         <div className="scan-status">
           <div className="loading-spinner small" />
-          <span>リアルタイムで　よみとっています...</span>
+          <span>よみとっています...</span>
         </div>
       )}
 
-      <div className="live-results">
-        {results.map((result) => (
-          <div key={result.id} className="live-result-item">
-            <div className="live-result-content">
-              <div className="furigana-text large">
-                {result.furigana.map((item, i) => (
-                  <span key={i} className="word">
-                    {item.hasKanji ? (
-                      <ruby>
-                        {item.text}
-                        <rt>{item.reading}</rt>
-                      </ruby>
-                    ) : (
-                      item.text
-                    )}
-                  </span>
-                ))}
+      {!isAnalyzing && results.length > 0 && (
+        <div className="live-results">
+          {results.map((result) => (
+            <div key={result.id} className="live-result-item">
+              <div className="live-result-content">
+                <div className="furigana-text large">
+                  {result.furigana.map((item, i) => (
+                    <span key={i} className="word">
+                      {item.hasKanji ? (
+                        <ruby>
+                          {item.text}
+                          <rt>{item.reading}</rt>
+                        </ruby>
+                      ) : (
+                        item.text
+                      )}
+                    </span>
+                  ))}
+                </div>
               </div>
+              <button className="speak-btn" onClick={() => speak(result.text)}>
+                🔊
+              </button>
             </div>
-            <button className="speak-btn" onClick={() => speak(result.text)}>
-              🔊
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {stopped && results.length === 0 && (
+      {!isAnalyzing && capturedImage && results.length === 0 && (
         <div className="results-area">
           <p className="no-results">かんじが　みつかりませんでした</p>
         </div>
       )}
 
-      {stopped && allText && (
+      {!isAnalyzing && allText && (
         <div className="camera-controls">
           <button className="speak-btn-large" onClick={() => speak(allText)}>
-            🔊 ぜんぶ　よむ
+            🔊 よむ
           </button>
         </div>
       )}
