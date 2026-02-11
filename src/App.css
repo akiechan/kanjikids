@@ -536,7 +536,7 @@ body {
   position: relative;
   background: #000;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 3 / 4;
   overflow: hidden;
 }
 
@@ -544,6 +544,11 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.camera-area video.zoomed {
+  transform: scale(1.5);
+  transform-origin: center center;
 }
 
 .camera-area video.hidden {
@@ -574,10 +579,9 @@ body {
   animation: scan-pulse 2s ease-in-out infinite;
 }
 
-.scan-box.wide {
-  width: 60%;
-  aspect-ratio: 1 / 1;
-  height: auto;
+.scan-box.tall {
+  width: 30%;
+  height: 80%;
 }
 
 @keyframes scan-pulse {

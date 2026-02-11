@@ -13,7 +13,12 @@ export default function CameraMode({ deeplKey, onBack }) {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          zoom: { ideal: 2 },
+        },
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -43,17 +48,23 @@ export default function CameraMode({ deeplKey, onBack }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Crop to the tall rectangle scan box (30% width, 80% height, centered)
+    const cropW = video.videoWidth * 0.3;
+    const cropH = video.videoHeight * 0.8;
+    const cropX = (video.videoWidth - cropW) / 2;
+    const cropY = (video.videoHeight - cropH) / 2;
+
+    canvas.width = cropW;
+    canvas.height = cropH;
 
     // Save a color version for display
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
     const imageUrl = canvas.toDataURL('image/png');
     setCapturedImage(imageUrl);
 
     // Apply filters for OCR
     ctx.filter = 'contrast(1.5) grayscale(1)';
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
     ctx.filter = 'none';
 
     stopCamera();
@@ -112,8 +123,13 @@ export default function CameraMode({ deeplKey, onBack }) {
           ref={videoRef}
           autoPlay
           playsInline
-          className={isStreaming ? 'visible' : 'hidden'}
+          className={isStreaming ? 'visible zoomed' : 'hidden'}
         />
+        {isStreaming && (
+          <div className="scan-overlay">
+            <div className="scan-box tall" />
+          </div>
+        )}
         {capturedImage && !isStreaming && (
           <div className="captured-preview">
             <img src={capturedImage} alt="とった　しゃしん" />
