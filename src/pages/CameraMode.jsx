@@ -135,21 +135,18 @@ export default function CameraMode({ deeplKey, onBack }) {
         <h1>カメラモード 📷</h1>
       </div>
 
-      {isStreaming && (
-        <div className="camera-area">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="visible zoomed"
-          />
-          <div className="scan-overlay">
-            <div className={`scan-box ${boxMode}`} />
-          </div>
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <div className="camera-area" style={{ display: isStreaming ? 'block' : 'none' }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="zoomed"
+        />
+        <div className="scan-overlay">
+          <div className={`scan-box ${boxMode}`} />
         </div>
-      )}
-      {!isStreaming && <canvas ref={canvasRef} style={{ display: 'none' }} />}
+      </div>
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       {capturedImage && !isStreaming && (
         <div className="captured-crop">
