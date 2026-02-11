@@ -9,7 +9,6 @@ export default function CameraMode({ deeplKey, onBack }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const workerRef = useRef(null);
 
   const startCamera = async () => {
     try {
@@ -61,13 +60,16 @@ export default function CameraMode({ deeplKey, onBack }) {
     setIsAnalyzing(true);
 
     try {
-      const Tesseract = await import('tesseract.js');
-      workerRef.current = await Tesseract.createWorker('jpn');
-      const { data: { text } } = await workerRef.current.recognize(canvas);
-      await workerRef.current.terminate();
-      workerRef.current = null;
+      // Send image to server-side OCR
+      const imageData = canvas.toDataURL('image/png');
+      const ocrRes = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageData }),
+      });
 
-      const cleanText = text.replace(/[\s\n\r]+/g, '').trim();
+      if (!ocrRes.ok) throw new Error(`OCR error: ${ocrRes.status}`);
+      const { text: cleanText } = await ocrRes.json();
 
       if (cleanText && cleanText.length > 0) {
         const furigana = await getFurigana(cleanText);
@@ -83,15 +85,13 @@ export default function CameraMode({ deeplKey, onBack }) {
     setIsAnalyzing(false);
   }, [stopCamera]);
 
-  const handleBack = async () => {
-    if (workerRef.current) await workerRef.current.terminate().catch(() => {});
+  const handleBack = () => {
     stopCamera();
     onBack();
   };
 
   useEffect(() => {
     return () => {
-      if (workerRef.current) workerRef.current.terminate().catch(() => {});
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -129,9 +129,12 @@ export default function CameraMode({ deeplKey, onBack }) {
           </button>
         )}
         {isStreaming && (
-          <button className="camera-shutter-btn" onClick={takePicture}>
-            📸 しゃしんを　とる
-          </button>
+          <>
+            <button className="camera-shutter-btn" onClick={takePicture}>
+              📸
+            </button>
+            <span className="shutter-hint">ボタンを　おして　しゃしんを　とってね</span>
+          </>
         )}
         {capturedImage && !isAnalyzing && (
           <button className="camera-start-btn" onClick={startCamera}>

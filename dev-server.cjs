@@ -1,9 +1,10 @@
 const express = require('express');
 const kuromoji = require('kuromoji');
+const Tesseract = require('tesseract.js');
 const path = require('path');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 let tokenizer = null;
 
@@ -60,6 +61,25 @@ app.post('/api/tokenize', (req, res) => {
   res.json({ furigana });
 });
 
+app.post('/api/ocr', async (req, res) => {
+  const { image } = req.body;
+  if (!image) {
+    return res.status(400).json({ error: 'Missing image' });
+  }
+
+  try {
+    const worker = await Tesseract.createWorker('jpn');
+    const { data: { text } } = await worker.recognize(image);
+    await worker.terminate();
+
+    const cleanText = text.replace(/[\s\n\r]+/g, '').trim();
+    res.json({ text: cleanText });
+  } catch (err) {
+    console.error('OCR error:', err);
+    res.status(500).json({ error: 'OCR failed' });
+  }
+});
+
 app.listen(3001, () => {
-  console.log('Dev tokenizer server on http://localhost:3001');
+  console.log('Dev server on http://localhost:3001');
 });
