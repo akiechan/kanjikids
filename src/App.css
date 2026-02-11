@@ -567,6 +567,11 @@ body {
   animation: scan-pulse 2s ease-in-out infinite;
 }
 
+.scan-box.wide {
+  width: 70%;
+  height: 30%;
+}
+
 @keyframes scan-pulse {
   0%, 100% { border-color: var(--camera); }
   50% { border-color: #69F0AE; }
@@ -658,6 +663,72 @@ body {
   color: var(--text-light);
   text-align: center;
   padding: 20px;
+}
+
+/* ===== Live Results (Camera Real-time) ===== */
+.scan-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  font-size: 16px;
+  color: var(--camera);
+  font-weight: 700;
+}
+
+.live-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 20px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.live-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--camera);
+  animation: slide-in 0.4s ease-out;
+}
+
+.live-result-content {
+  flex: 1;
+  min-width: 0;
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.speak-btn-large {
+  padding: 16px 32px;
+  background: var(--camera);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.2s;
+}
+
+.speak-btn-large:hover {
+  transform: scale(1.05);
 }
 
 /* ===== Responsive ===== */
