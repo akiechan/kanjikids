@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { getFurigana, speak } from '../utils/japanese'
-import { translateWithDeepL } from '../utils/api'
+import { translateWithDeepL, batchTranslate } from '../utils/api'
 
 export default function SpeechMode({ deeplKey, onBack }) {
   const [isListening, setIsListening] = useState(false);
@@ -9,7 +9,6 @@ export default function SpeechMode({ deeplKey, onBack }) {
   const [fontSize, setFontSize] = useState(28);
   const [englishTranslation, setEnglishTranslation] = useState('');
   const [wordTranslations, setWordTranslations] = useState({});
-  const [selectedWord, setSelectedWord] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [analyzed, setAnalyzed] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -52,7 +51,6 @@ export default function SpeechMode({ deeplKey, onBack }) {
     setAnalyzed(false);
     setEnglishTranslation('');
     setWordTranslations({});
-    setSelectedWord(null);
     setFuriganaData([]);
   }, []);
 
@@ -69,13 +67,29 @@ export default function SpeechMode({ deeplKey, onBack }) {
         const furigana = await getFurigana(transcript);
         setFuriganaData(furigana);
         setAnalyzed(true);
+
+        // Auto-translate all unique meaningful words
+        const uniqueWords = [...new Set(
+          furigana
+            .filter((item) => item.text.trim().length > 0 && item.hasKanji)
+            .map((item) => item.text)
+        )];
+
+        if (uniqueWords.length > 0) {
+          try {
+            const translations = await batchTranslate(uniqueWords, deeplKey);
+            setWordTranslations(translations);
+          } catch (err) {
+            console.error('Batch translate error:', err);
+          }
+        }
       } catch (err) {
         console.error('Tokenizer error:', err);
         setAnalyzed(true);
       }
       setIsAnalyzing(false);
     }
-  }, [transcript]);
+  }, [transcript, deeplKey]);
 
   const translateToEnglish = async () => {
     setIsTranslating(true);
@@ -87,23 +101,6 @@ export default function SpeechMode({ deeplKey, onBack }) {
       alert('ほんやくに　しっぱいしました');
     }
     setIsTranslating(false);
-  };
-
-  const translateWord = async (word) => {
-    if (!word.trim()) return;
-
-    if (wordTranslations[word]) {
-      setSelectedWord(selectedWord === word ? null : word);
-      return;
-    }
-
-    setSelectedWord(word);
-    try {
-      const result = await translateWithDeepL(word, deeplKey);
-      setWordTranslations((prev) => ({ ...prev, [word]: result }));
-    } catch (err) {
-      console.error('Word translation error:', err);
-    }
   };
 
   return (
@@ -152,23 +149,19 @@ export default function SpeechMode({ deeplKey, onBack }) {
           </div>
 
           {analyzed && furiganaData.length > 0 ? (
-            <div className="furigana-text">
+            <div className="furigana-text with-english">
               {furiganaData.map((item, i) => (
-                <span
-                  key={i}
-                  className={`word ${item.hasKanji ? 'clickable' : ''}`}
-                  onClick={() => item.text.trim() && translateWord(item.text)}
-                >
+                <span key={i} className={`word-block ${item.hasKanji ? 'has-kanji' : ''}`}>
                   {item.hasKanji ? (
                     <ruby>
                       {item.text}
                       <rt>{item.reading}</rt>
                     </ruby>
                   ) : (
-                    item.text
+                    <span>{item.text}</span>
                   )}
-                  {selectedWord === item.text && wordTranslations[item.text] && (
-                    <span className="word-translation">{wordTranslations[item.text]}</span>
+                  {item.hasKanji && wordTranslations[item.text] && (
+                    <span className="word-english">{wordTranslations[item.text]}</span>
                   )}
                 </span>
               ))}
