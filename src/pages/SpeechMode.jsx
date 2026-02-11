@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { tokenize, tokensToFurigana, speak } from '../utils/japanese'
+import { initTokenizer, tokenize, tokensToFurigana, speak } from '../utils/japanese'
 import { translateWithDeepL } from '../utils/api'
 
 export default function SpeechMode({ deeplKey, onBack }) {
@@ -12,6 +12,7 @@ export default function SpeechMode({ deeplKey, onBack }) {
   const [selectedWord, setSelectedWord] = useState(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [analyzed, setAnalyzed] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const recognitionRef = useRef(null);
 
   const startListening = useCallback(() => {
@@ -55,7 +56,7 @@ export default function SpeechMode({ deeplKey, onBack }) {
     setFuriganaData([]);
   }, []);
 
-  const stopListening = useCallback(() => {
+  const stopListening = useCallback(async () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -63,18 +64,22 @@ export default function SpeechMode({ deeplKey, onBack }) {
     setIsListening(false);
 
     if (transcript) {
-      const tokens = tokenize(transcript);
-      const furigana = tokensToFurigana(tokens);
-      setFuriganaData(furigana);
-      setAnalyzed(true);
+      setIsAnalyzing(true);
+      try {
+        await initTokenizer();
+        const tokens = tokenize(transcript);
+        const furigana = tokensToFurigana(tokens);
+        setFuriganaData(furigana);
+        setAnalyzed(true);
+      } catch (err) {
+        console.error('Tokenizer error:', err);
+        setAnalyzed(true);
+      }
+      setIsAnalyzing(false);
     }
   }, [transcript]);
 
   const translateToEnglish = async () => {
-    if (!deeplKey) {
-      alert('せっていで　DeepL API キーを　いれてね');
-      return;
-    }
     setIsTranslating(true);
     try {
       const result = await translateWithDeepL(transcript, deeplKey);
@@ -91,11 +96,6 @@ export default function SpeechMode({ deeplKey, onBack }) {
 
     if (wordTranslations[word]) {
       setSelectedWord(selectedWord === word ? null : word);
-      return;
-    }
-
-    if (!deeplKey) {
-      alert('せっていで　DeepL API キーを　いれてね');
       return;
     }
 
@@ -136,9 +136,15 @@ export default function SpeechMode({ deeplKey, onBack }) {
           </button>
         )}
         {isListening && <div className="listening-indicator">きいています...</div>}
+        {isAnalyzing && (
+          <div className="processing">
+            <div className="loading-spinner small" />
+            <span>じしょを　よみこんでいます...</span>
+          </div>
+        )}
       </div>
 
-      {transcript && (
+      {transcript && !isAnalyzing && (
         <div className="transcript-area" style={{ fontSize: `${fontSize}px` }}>
           <div className="transcript-header">
             <span>にんしきした　ことば</span>
@@ -147,7 +153,7 @@ export default function SpeechMode({ deeplKey, onBack }) {
             </button>
           </div>
 
-          {analyzed ? (
+          {analyzed && furiganaData.length > 0 ? (
             <div className="furigana-text">
               {furiganaData.map((item, i) => (
                 <span
