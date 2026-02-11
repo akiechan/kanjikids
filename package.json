@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node dev-server.cjs & vite --host --port 8080",
+    "dev:api": "node dev-server.cjs",
+    "dev:vite": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server.cjs"
@@ -12,6 +14,7 @@
   "dependencies": {
     "express": "^4.21.0",
     "http-proxy-middleware": "^3.0.3",
+    "kuromoji": "^0.1.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tesseract.js": "^5.1.1"

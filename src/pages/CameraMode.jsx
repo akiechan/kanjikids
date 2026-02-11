@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { initTokenizer, tokenize, tokensToFurigana, speak } from '../utils/japanese'
+import { getFurigana, speak } from '../utils/japanese'
 
 export default function CameraMode({ deeplKey, onBack }) {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -64,12 +64,7 @@ export default function CameraMode({ deeplKey, onBack }) {
     stopCamera();
 
     try {
-      // Load OCR and dictionary in parallel
-      const [Tesseract] = await Promise.all([
-        import('tesseract.js'),
-        initTokenizer(),
-      ]);
-
+      const Tesseract = await import('tesseract.js');
       const worker = await Tesseract.createWorker('jpn');
       const { data: { text } } = await worker.recognize(canvas);
       await worker.terminate();
@@ -78,8 +73,7 @@ export default function CameraMode({ deeplKey, onBack }) {
       setRecognizedText(cleanText);
 
       if (cleanText) {
-        const tokens = tokenize(cleanText);
-        const furigana = tokensToFurigana(tokens);
+        const furigana = await getFurigana(cleanText);
         setFuriganaData(furigana);
       }
 

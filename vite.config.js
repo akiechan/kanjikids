@@ -17,7 +17,11 @@ export default defineConfig(({ mode }) => {
               proxyReq.setHeader('Authorization', `DeepL-Auth-Key ${env.VITE_DEEPL_API_KEY}`)
             })
           },
-        }
+        },
+        '/api/tokenize': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+        },
       }
     }
   }

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { initTokenizer, tokenize, tokensToFurigana, speak } from '../utils/japanese'
+import { getFurigana, speak } from '../utils/japanese'
 import { translateWithDeepL } from '../utils/api'
 
 export default function SpeechMode({ deeplKey, onBack }) {
@@ -66,9 +66,7 @@ export default function SpeechMode({ deeplKey, onBack }) {
     if (transcript) {
       setIsAnalyzing(true);
       try {
-        await initTokenizer();
-        const tokens = tokenize(transcript);
-        const furigana = tokensToFurigana(tokens);
+        const furigana = await getFurigana(transcript);
         setFuriganaData(furigana);
         setAnalyzed(true);
       } catch (err) {
@@ -139,7 +137,7 @@ export default function SpeechMode({ deeplKey, onBack }) {
         {isAnalyzing && (
           <div className="processing">
             <div className="loading-spinner small" />
-            <span>じしょを　よみこんでいます...</span>
+            <span>かんがえています...</span>
           </div>
         )}
       </div>
