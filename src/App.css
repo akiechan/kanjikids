@@ -672,19 +672,19 @@ body {
   font-weight: 700;
 }
 
-.captured-preview {
-  width: 100%;
-  height: 100%;
+.captured-crop {
   display: flex;
-  align-items: center;
   justify-content: center;
-  background: #000;
+  padding: 16px 20px;
 }
 
-.captured-preview img {
-  max-width: 100%;
-  max-height: 100%;
+.captured-crop img {
+  max-width: 40%;
+  max-height: 50vh;
   object-fit: contain;
+  border-radius: 12px;
+  border: 3px solid var(--camera);
+  box-shadow: var(--shadow);
 }
 
 .processing {

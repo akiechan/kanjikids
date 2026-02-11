@@ -71,13 +71,18 @@ export default function CameraMode({ deeplKey, onBack }) {
     setIsAnalyzing(true);
 
     try {
-      // Send image to server-side OCR
+      // Send image to server-side OCR with 30s timeout
       const imageData = canvas.toDataURL('image/png');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
       const ocrRes = await fetch('/api/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageData }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!ocrRes.ok) throw new Error(`OCR error: ${ocrRes.status}`);
       const { text: cleanText } = await ocrRes.json();
@@ -90,7 +95,11 @@ export default function CameraMode({ deeplKey, onBack }) {
       }
     } catch (err) {
       console.error('OCR error:', err);
-      setResults([]);
+      if (err.name === 'AbortError') {
+        setResults([{ id: 1, text: '', furigana: [], timeout: true }]);
+      } else {
+        setResults([]);
+      }
     }
 
     setIsAnalyzing(false);
@@ -118,25 +127,27 @@ export default function CameraMode({ deeplKey, onBack }) {
         <h1>カメラモード 📷</h1>
       </div>
 
-      <div className="camera-area">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className={isStreaming ? 'visible zoomed' : 'hidden'}
-        />
-        {isStreaming && (
+      {isStreaming && (
+        <div className="camera-area">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            className="visible zoomed"
+          />
           <div className="scan-overlay">
             <div className="scan-box tall" />
           </div>
-        )}
-        {capturedImage && !isStreaming && (
-          <div className="captured-preview">
-            <img src={capturedImage} alt="とった　しゃしん" />
-          </div>
-        )}
-        <canvas ref={canvasRef} style={{ display: 'none' }} />
-      </div>
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+        </div>
+      )}
+      {!isStreaming && <canvas ref={canvasRef} style={{ display: 'none' }} />}
+
+      {capturedImage && !isStreaming && (
+        <div className="captured-crop">
+          <img src={capturedImage} alt="とった　しゃしん" />
+        </div>
+      )}
 
       <div className="camera-controls">
         {!isStreaming && !capturedImage && !isAnalyzing && (
@@ -191,6 +202,12 @@ export default function CameraMode({ deeplKey, onBack }) {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {!isAnalyzing && capturedImage && results.length > 0 && results[0].timeout && (
+        <div className="results-area">
+          <p className="no-results">じかんが　かかりすぎました。もういちど　ためしてね</p>
         </div>
       )}
 
